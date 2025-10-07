@@ -4,7 +4,7 @@ clc
 %close all
 clf reset
 
-warning('off','all') %don't care
+warning('off','all')
 
 render_thing = false;
 save_sim = true;
@@ -157,7 +157,7 @@ iter = 1;
 frame = 1;
 while iter <= maxiters
     
-    if exist(filename_storesim, 'file')
+    if exist(filename_storesim, 'file') && iter == 1
         load(filename_storesim);
     end
 
@@ -328,13 +328,6 @@ while iter <= maxiters
         drawnow()
         iter
 
-        % if render_thing
-        %     frame_videowrite_total = frame_colourised;
-        %     frame_videowrite_total = frame_videowrite_total + greyscale_img_solidmask(solid_mask);
-        %     frame_videowrite_total = frame_videowrite_total + greyscale_img_solidmask(collider_mask)./5;
-        %     frame_videowrite_total = flipud(frame_videowrite_total);
-        %     writeVideo(v,frame_videowrite_total);
-        % end
 
         frame_series(:,:,frame) = single(plot_field);
         frame = frame+1;
@@ -342,13 +335,14 @@ while iter <= maxiters
             save(filename,"frame_colourised","frame_colour_total","solid_mask","plot_field");
             imwrite(flipud(frame_colour_total),png_name)
         end
+
+        if save_sim
+            save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","particle_ID_list","iter","v_x","v_y")
+        end
     end
 
     iter = iter+1;
 
-    if save_sim
-        save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","particle_ID_list","iter","v_x","v_y")
-    end
 end
 
 if render_thing
@@ -418,7 +412,7 @@ function [return_map,return_tilemap] = implement_chars_on_map(order_map,message,
 
                 return_tilemap(re_y1:re_y2,re_x1:re_x2) = 1;
 
-                if rand() < 1e-4 %some random jitter (character D may clip)
+                if rand() < 1e-4
                     char_tile_spec = circshift(char_tile_spec,[0,1]);
                     char_tile_spec(:,1) = 0;
                 end
