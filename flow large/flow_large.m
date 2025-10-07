@@ -38,9 +38,9 @@ img_fancy = imread("img_large.png");
 cmap = interp1( [0,0.03,0.06,0.1,0.2,1] , [[0, 0, 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3)); %not regular cmap
 
 load("tiles_formatted.mat")
-load("message.mat")
 
-textcells_message = lecture_total_hex;
+textcells_message = floor(rand(1,1e6)*16); 
+textcells_message = string(dec2hex(textcells_message)).';
 
 scene_scale = [height(collider_mask),width(collider_mask)]+2*hidden_edge_factor; %height, width
 
@@ -106,7 +106,7 @@ frame = 1;
 
 while iter <= maxiters
 
-    if exist(filename_storesim, 'file') %this takes so long we need to be saving as we go
+    if exist(filename_storesim, 'file') && iter == 1 %this takes so long we need to be saving as we go
         load(filename_storesim)
     end
 
@@ -248,11 +248,11 @@ while iter <= maxiters
         save(filename,"frame_current","hidden_edge_factor")
 
         iter
+
+        save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","iter","v_x","v_y")
     end
 
     iter = iter+1;
-
-    save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","iter","v_x","v_y")
 end
 
 if render_test
