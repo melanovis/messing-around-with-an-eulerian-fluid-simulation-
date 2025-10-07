@@ -4,33 +4,34 @@ clc
 %close all
 clf reset
 
-warning('off','all')
+warning('off','all') %don't care
 
+render_thing = false;
 save_sim = true;
 
-max_particle_quantity = 5e6;
+max_particle_quantity = 1e7;
 micro_turbulance_factor_default = 1e-6;
 grid_spacing = 1;
 emission_turbulance_factor = 1; % 1 for complete intra pixel rand on the source mask
 frame_rem_factor = 7; %higher is more simtime between frames
 fps = 60;
-shock_frames = [1];
+shock_frames = [1]; %iters when shocks occur
 maxiters = fps * frame_rem_factor * 30;
 texteffect_scale_factor = 1;
 
 png_name = "img_write.png";
 
-collider_mask_raw = imread("encounter_mask_testing.png");
+collider_mask_raw = imread("encounter_mask.png");
 collider_mask = single(squeeze(collider_mask_raw(:,:,1)));
 collider_mask = flipud(collider_mask);
 collider_mask(collider_mask<100)=0; %convert to logical
 
-mask_extra_1_raw = imread("shoulder_mask_testing.png");
+mask_extra_1_raw = imread("shoulder_mask.png");
 mask_extra_1 = single(squeeze(mask_extra_1_raw(:,:,1)));
 mask_extra_1 = flipud(mask_extra_1);
 mask_extra_1 = logical(mask_extra_1);
 
-mask_extra_2_raw = imread("horn_out_mask_testing.png");
+mask_extra_2_raw = imread("horn_out_mask.png");
 mask_extra_2 = single(squeeze(mask_extra_2_raw(:,:,1)));
 mask_extra_2 = flipud(mask_extra_2);
 mask_extra_2 = logical(mask_extra_2);
@@ -53,13 +54,14 @@ augmented_abyss = augmented_abyss(round(linspace(1,height(augmented_abyss),4)),:
 
 cmap_1 = interp1([linspace(0,1,5)], [[0 0 0]; augmented_abyss], linspace(0, 1, 1e3));
 cmap_2 = interp1([0,0.2,0.4,0.6,0.8,1], [[0 0 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3));
+%interp1( [0,0.03,0.06,0.1,0.2,1] , [[0, 0, 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3))
 
 cmap_series(:,:,1) = single(cmap_1);
 cmap_series(:,:,2) = single(cmap_2);
 
 text_scale_series = [
-8
-5
+9
+6
 ];
 
 load("tiles_formatted.mat")
@@ -144,11 +146,18 @@ particle_ID_list = [];
 scene_height = height(pressure_field);
 scene_width = width(pressure_field);
 
+if render_thing
+    v = VideoWriter("fluid_horsemask_test", 'MPEG-4');
+    v.FrameRate = fps;
+    open(v);
+end
+
+
 iter = 1;
 frame = 1;
 while iter <= maxiters
     
-    if exist(filename_storesim, 'file') && save_sim && iter>1
+    if exist(filename_storesim, 'file')
         load(filename_storesim);
     end
 
@@ -165,7 +174,7 @@ while iter <= maxiters
     if iter > 5
         solve_iter_margin = 5e-3;
     else
-        solve_iter_margin = 5e-4;
+        solve_iter_margin = 1e-3;
     end
 
     pressure_solve_iters = 1;
@@ -181,9 +190,11 @@ while iter <= maxiters
         end
         pressure_field = p_tmpfield;
 
+        %boundary conditions
         pressure_field(1,1:end) = pressure_field(2,1:end);
         pressure_field(end,1:end) = pressure_field(end-1,1:end);
 
+        %flow constraints
         pressure_field(pressure_out_mask) = 0;
         pressure_field(pressure_in_mask) = 2;
 
@@ -197,7 +208,7 @@ while iter <= maxiters
     v_x(3:end-2, 3:end-2) = v_x(3:end-2, 3:end-2) - dx;
     v_y(3:end-2, 3:end-2) = v_y(3:end-2, 3:end-2) - dy;
 
-    [pv_x, pv_y] = RK4_step(grid_x, grid_y, v_x, v_y, -1);
+    [pv_x, pv_y] = RK4_step(grid_x, grid_y, v_x, v_y, -1); %backward advection
     v_x = interp2(v_x, pv_x, pv_y, 'linear', 0);
     v_y = interp2(v_y, pv_x, pv_y, 'linear', 0);
 
@@ -210,7 +221,7 @@ while iter <= maxiters
     v_x = v_x + (rand(size(v_x))-0.5).*2*micro_turbulance_factor;
     v_y = v_y + (rand(size(v_y))-0.5).*2*micro_turbulance_factor;
 
-    for n=1:6
+    for n=1:6 %how many particles are we adding?
         particlelist_x = [particle_sourcemask_x + rand(height(particle_sourcemask_x),1)*emission_turbulance_factor; particlelist_x];
         particlelist_y = [particle_sourcemask_y + rand(height(particle_sourcemask_y),1)*emission_turbulance_factor; particlelist_y];
         particle_ID_list = [particle_source_ID, particle_ID_list];
@@ -218,17 +229,20 @@ while iter <= maxiters
 
     [particlelist_x, particlelist_y] = RK4_step(particlelist_x, particlelist_y, v_x, v_y, 1); %forward advection
 
+    %cull particles on boundary
     particle_boundary_mask = [particlelist_x < outflow_bounds_x(1)] + [particlelist_x > outflow_bounds_x(2)] + [particlelist_y < outflow_bounds_y(1)] + [particlelist_y > outflow_bounds_y(2)];
     particle_boundary_mask = logical(particle_boundary_mask);
     particlelist_x(particle_boundary_mask) = [];
     particlelist_y(particle_boundary_mask) = [];
     particle_ID_list(particle_boundary_mask) = [];
 
+    %particles intersecting with solid
     ind_colliding = find_colliding_particles(particlelist_x, particlelist_y, solid_mask);
     particlelist_x(ind_colliding) = [];
     particlelist_y(ind_colliding) = [];
     particle_ID_list(ind_colliding) = [];
 
+    %remove when too many particles
     particle_ind_remove = [];
     if length(particlelist_x) > max_particle_quantity
         cull_quantity = length(particlelist_x) - max_particle_quantity;
@@ -261,7 +275,9 @@ while iter <= maxiters
             smooth_densitymap = smooth_map(particle_densitymap,smoothing_filter);
             
             plot_field = smooth_densitymap;
+        
             plot_field = plot_field./max(max(plot_field));
+    
             plot_solidmask = single(solid_mask);
 
             textgrid_size = [round(scene_height/texteffect_scale_factor),round(scene_width/texteffect_scale_factor)];
@@ -312,6 +328,14 @@ while iter <= maxiters
         drawnow()
         iter
 
+        % if render_thing
+        %     frame_videowrite_total = frame_colourised;
+        %     frame_videowrite_total = frame_videowrite_total + greyscale_img_solidmask(solid_mask);
+        %     frame_videowrite_total = frame_videowrite_total + greyscale_img_solidmask(collider_mask)./5;
+        %     frame_videowrite_total = flipud(frame_videowrite_total);
+        %     writeVideo(v,frame_videowrite_total);
+        % end
+
         frame_series(:,:,frame) = single(plot_field);
         frame = frame+1;
         if save_sim
@@ -323,11 +347,16 @@ while iter <= maxiters
     iter = iter+1;
 
     if save_sim
-        save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","iter","v_x","v_y")
+        save(filename_storesim,"pressure_field","particlelist_x","particlelist_y","particle_ID_list","iter","v_x","v_y")
     end
 end
 
+if render_thing
+    close(v);
+end
+
 sound(sin(2*pi*400*(0:1/14400:0.15)), 14400);
+
 
 
 function return_frame = greyscale_img_solidmask(solid_mask)
@@ -431,7 +460,12 @@ end
 function smooth_densitymap = smooth_map(particle_densitymap,smoothing_filter)
     region_map = logical(particle_densitymap == 0);
     smooth_densitymap = conv2(particle_densitymap, smoothing_filter, 'same');
+
+    %smoothing out single holes
+    % hole_mask = find_single_holes(region_map);
+    % fluidmap = ~region_map | hole_mask;
     fluidmap = ~region_map;
+
     smooth_densitymap(~fluidmap) = 0;
 end
 
