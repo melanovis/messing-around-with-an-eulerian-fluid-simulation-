@@ -13,7 +13,7 @@ max_particle_quantity = 1e7;
 micro_turbulance_factor_default = 1e-6;
 grid_spacing = 1;
 emission_turbulance_factor = 1; % 1 for complete intra pixel rand on the source mask
-frame_rem_factor = 7; %higher is more simtime between frames
+frame_rem_factor = 15; %higher is more simtime between frames
 fps = 60;
 shock_frames = [1]; %iters when shocks occur
 maxiters = fps * frame_rem_factor * 30;
@@ -43,25 +43,24 @@ alternate_sourcemask = mask_extra_1;
 collider_mask_perf = collider_mask;
 for n=1:height(collider_mask)
     for m=1:width(collider_mask)
-        if collider_mask(n,m) && rand() > 0.02
+        if collider_mask(n,m) && rand() > 0.01
             collider_mask_perf(n,m) = 1;
         end
     end
 end
 
 augmented_abyss = abyss;
-augmented_abyss = augmented_abyss(round(linspace(1,height(augmented_abyss),4)),:);
-
-cmap_1 = interp1([linspace(0,1,5)], [[0 0 0]; augmented_abyss], linspace(0, 1, 1e3));
-cmap_2 = interp1([0,0.2,0.4,0.6,0.8,1], [[0 0 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3));
-%interp1( [0,0.03,0.06,0.1,0.2,1] , [[0, 0, 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3))
+augmented_abyss = augmented_abyss(round(linspace(1,height(augmented_abyss),5)),:);
+cmap_1 = interp1( [0,1e-7,1e-6,1e-5,1e-3,1] , [[0, 0, 0]; augmented_abyss], linspace(0, 1, 1e3));
+cmap_2 = interp1( [0,0.03,0.06,0.1,0.2,1] , [[0, 0, 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3));
+%interp1([0,0.2,0.4,0.6,0.8,1], [[0 0 0]; [0.259 0.039 0.408]; [0.584 0.149 0.404]; [0.867 0.318 0.227]; [0.98 0.647 0.039]; [0.98 1 0.643]], linspace(0, 1, 1e3)); 
 
 cmap_series(:,:,1) = single(cmap_1);
 cmap_series(:,:,2) = single(cmap_2);
 
 text_scale_series = [
-9
-6
+1
+1
 ];
 
 load("tiles_formatted.mat")
@@ -99,6 +98,12 @@ smoothing_filter = smoothing_filter.* (1/sum(sum(smoothing_filter)));
 solid_mask = collider_mask_perf > 125;
 solid_mask = solid_mask + mask_extra_2;
 solid_mask = logical(solid_mask);
+
+if ~exist("solid_mask_store.mat", 'file') %this takes so long we need to be saving as we go
+    save("solid_mask_store.mat","solid_mask")
+else
+    load("solid_mask_store.mat")
+end
 
 particle_inflow_mask = zeros(scene_scale(1), scene_scale(2));
 particle_inflow_mask(3:end-2,end-2) = 1;
