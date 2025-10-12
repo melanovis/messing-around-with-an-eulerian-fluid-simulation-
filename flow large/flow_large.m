@@ -4,6 +4,7 @@ clc
 %close all
 clf reset
 
+warning('off','all') 
 
 max_particle_quantity = 3e7;
 micro_turbulance_factor_default = 1e-6;
