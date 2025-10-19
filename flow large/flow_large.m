@@ -256,9 +256,6 @@ while iter <= maxiters
     iter = iter+1;
 end
 
-if render_test
-    close(v);
-end
 
 sound(sin(2*pi*400*(0:1/14400:0.15)), 14400);
 
@@ -393,4 +390,5 @@ function [x_new, y_new] = RK4_step(p_x, p_y, v_x, v_y, h)
    k4y = interp2(v_y, p_x + h * k3x, p_y + h * k3y, 'linear', 0);
    x_new = p_x + h/6 * (k1x + 2*k2x + 2*k3x + k4x);
    y_new = p_y + h/6 * (k1y + 2*k2y + 2*k3y + k4y);
+
 end
